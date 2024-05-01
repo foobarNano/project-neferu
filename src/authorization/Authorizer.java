@@ -11,7 +11,7 @@ public final class Authorizer
 {
 
     private static Authorizer authorizer;
-    private static HashMap<Byte[], User> users;
+    private static HashMap<byte[], User> users;
 
     private Authorizer()
     {
@@ -30,19 +30,18 @@ public final class Authorizer
      */
     public static void synchronize()
     {
-        HashMap<Byte[], User> temp = Serializer.read_object(Constants.USERBASE_PATH);
+        HashMap<byte[], User> temp = Serializer.read_object(Constants.USERBASE_PATH);
 
         if (temp == null) temp = new HashMap<>();
 
         users = temp;
     }
 
-    public User authorize(Byte[] hash) throws AuthenticationException
+    public User authorize(byte[] hash) throws AuthenticationException
     {
         if (!users.containsKey(hash))
         {
-            throw new AuthenticationException("Unable to authenticate client.");
-        }
+            return null;
 
         return users.get(hash);
     }

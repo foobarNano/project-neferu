@@ -4,8 +4,8 @@ import java.io.Serializable;
 
 public class User implements Serializable
 {
-    final String name;
-    final Permission[] permissions;
+    public final String name;
+    public final Permission[] permissions;
 
     User(String name, Permission... permissions)
     {

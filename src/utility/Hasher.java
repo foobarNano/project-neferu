@@ -1,5 +1,6 @@
 package utility;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -27,7 +28,7 @@ public enum Hasher
 
     public byte[] digest(String message)
     {
-        return generator.digest(message.getBytes(Constants.CHARSET));
+        return generator.digest(message.getBytes(StandardCharsets.UTF_8));
     }
 
     @Override

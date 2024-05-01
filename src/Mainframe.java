@@ -1,100 +1,121 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.ServerSocket;
-import java.net.Socket;
-
-import authorization.Authorizer;
-import authorization.User;
+import java.io.*;
+import java.net.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Mainframe implements Runnable
 {
     private final int PORT;
-    private boolean running;
-    private ServerSocket serverSocket = null;
-    private Authorizer authorizer = null;
+    private final int LIMIT;
+    private final String FORMAT;
 
-    /**
-     * Generates and prepares the server for running. Only begins work once the {@link #run()} method is called.
-     * @param port The localhost port number to use
-     */
-    public Mainframe(int port)
+    private int count = 0;
+    private ServerSocket serverSocket = null;
+    private ExecutorService executor = null;
+    private boolean running = false;
+
+    public Mainframe(int port, int limit, String format)
     {
         this.PORT = port;
-        this.running = false;
+        this.LIMIT = limit;
+        this.FORMAT = format;
     }
 
-    /**
-     * Opens the server socket for connections and handles realtime communication.
-     */
+    public Mainframe(int port, int limit)
+    {
+        this(port, limit, "%s > %s");
+    }
+
+    public Mainframe(int port)
+    {
+        this(port, 10, "%s > %s");
+    }
+
+    @Override
     public void run()
     {
-        Socket clientSocket = null;
-        User client = null;
-
-        BufferedReader in = null;
-        PrintWriter out =  null;
-
         try
         {
             serverSocket = new ServerSocket(PORT);
-            authorizer = Authorizer.getInstance();
+            executor = Executors.newFixedThreadPool(LIMIT);
             running = true;
-            System.out.println(String.format("Server listening on port %s.", PORT));
-            
+
+            System.out.println(String.format("Server listening on port %s...", PORT));
+
             while (running)
             {
-                clientSocket = serverSocket.accept();
-                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                out = new PrintWriter(clientSocket.getOutputStream(), true);
-                System.out.println("A client is attempting to connect...");
+                Socket clientSocket = serverSocket.accept();
+                String name = String.format("Client %s", ++count);
 
-                while (client == null)
-                {
-                    byte[] hash = in.readLine().getBytes();
-                    System.out.println(hash);
-                    client = authorizer.authorize(hash);
-                    if (client == null) System.out.println("Failed to authenticate client.");
-                }
-                
-                out.println(client.permissions);
-                System.out.println(String.format("%s successfully connected.", client.toString()));
-                
-                String inputLine;
-                while ((inputLine = in.readLine()) != null)
-                {
-                    System.out.println(String.format("> %s", inputLine));
-                }
-                
-                clientSocket.close();
+                executor.execute(new ClientHandler(name, clientSocket, FORMAT));
+                System.out.println(String.format("[!] %s has connected :3", name));
             }
         }
         catch (IOException e) { e.printStackTrace(); }
         finally
         {
+            if (serverSocket != null)
+            {
+                try
+                {
+                    serverSocket.close();
+                }
+                catch (IOException e) { e.printStackTrace(); }
+            }
+        }
+    }
+
+    private static class ClientHandler implements Runnable
+    {
+        private final String name;
+        private final Socket clientSocket;
+        private final String format;
+
+        public ClientHandler(String name, Socket clientSocket, String format)
+        {
+            this.name = name;
+            this.clientSocket = clientSocket;
+            this.format = format;
+        }
+
+        @Override
+        public void run()
+        {
+            BufferedReader in = null;
+            PrintWriter out = null;
+
             try
             {
-                if (out != null) out.close();
-                if (in != null) in.close();
-                if (serverSocket != null) serverSocket.close();
+                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                out = new PrintWriter(clientSocket.getOutputStream(), true);
+
+                String message;
+                while ((message = in.readLine()) != null)
+                {
+                    System.out.println(String.format(format, name, message));
+                }
+
+                in.close();
+                out.close();
+                clientSocket.close();
             }
             catch (IOException e) { e.printStackTrace(); }
-            running = false;
+            finally
+            {
+                try
+                {
+                    if (in != null) in.close();
+                    if (out != null) out.close();
+                }
+                catch (IOException e) {}
+            }
+
+            System.out.println(String.format("[!] %s has disconnected :<", name));
         }
     }
 
     public static void main(String[] args)
     {
-
-        int port = 10001;
-        
-        if (args.length != 0)
-        {
-            try { port = Integer.parseInt(args[0]); }
-            catch (NumberFormatException e) {}
-        }
-
-        new Mainframe(port).run();
+        new Mainframe(10001).run();
     }
 }

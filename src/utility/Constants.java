@@ -1,8 +1,6 @@
 package utility;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
 /**
@@ -17,15 +15,12 @@ public final class Constants
     private Constants() {}
 
     private static final Properties P = init();
-    
-    private static final String DATA_PATH = P.getProperty("DATA_PATH");
-
-    public static final Charset CHARSET = StandardCharsets.UTF_8;
-    public static final String USERBASE_PATH = String.format("%s%s", DATA_PATH, P.getProperty("USERBASE_FILE"));
 
     private static Properties init()
     {
         Properties temp = new Properties();
+
+        // Declare properties here
         
         try
         {

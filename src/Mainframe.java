@@ -1,34 +1,33 @@
-import java.io.*;
-import java.net.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import utility.Constants;
+import utility.Hasher;
 
 public class Mainframe implements Runnable
 {
     private final int PORT;
     private final int LIMIT;
-    private final String FORMAT;
 
-    private int count = 0;
     private ServerSocket serverSocket = null;
     private ExecutorService executor = null;
     private boolean running = false;
 
-    public Mainframe(int port, int limit, String format)
+    public Mainframe(int port, int limit)
     {
         this.PORT = port;
         this.LIMIT = limit;
-        this.FORMAT = format;
-    }
-
-    public Mainframe(int port, int limit)
-    {
-        this(port, limit, "%s > %s");
     }
 
     public Mainframe(int port)
     {
-        this(port, 10, "%s > %s");
+        this(port, 10);
     }
 
     @Override
@@ -45,10 +44,7 @@ public class Mainframe implements Runnable
             while (running)
             {
                 Socket clientSocket = serverSocket.accept();
-                String name = String.format("Client %s", ++count);
-
-                executor.execute(new ClientHandler(name, clientSocket, FORMAT));
-                System.out.println(String.format("[!] %s has connected :3", name));
+                executor.execute(new ClientHandler(clientSocket));
             }
         }
         catch (IOException e) { e.printStackTrace(); }
@@ -67,39 +63,88 @@ public class Mainframe implements Runnable
 
     private static class ClientHandler implements Runnable
     {
-        private final String name;
         private final Socket clientSocket;
-        private final String format;
 
-        public ClientHandler(String name, Socket clientSocket, String format)
+        private String username = "Unknown";
+        private boolean authenticated = false;
+
+        private BufferedReader in = null;
+        private PrintWriter out = null;
+        
+        public ClientHandler(Socket clientSocket)
         {
-            this.name = name;
             this.clientSocket = clientSocket;
-            this.format = format;
+        }
+
+        private void authenticate()
+        {
+            try
+            {
+                String login = in.readLine();
+
+                if (login == null)
+                {
+                    clientSocket.close();
+                    return;
+                }
+
+                login = login.strip();
+                String hash = in.readLine().strip();
+                String double_hash = new String(Hasher.SHA3_256.digest(hash));
+
+                if (!Constants.USERS.containsKey(login)) throw new IOException("No such user.");
+
+                if (Constants.USERS.get(login).equals(double_hash))
+                {
+                    out.println(0);
+
+                    username = login;
+                    authenticated = true;
+                    return;
+                }
+            }
+            catch (IOException e) {}
+            
+            System.out.println("Failed to authenticate.");
+            out.println(-1);
         }
 
         @Override
         public void run()
         {
-            BufferedReader in = null;
-            PrintWriter out = null;
-
             try
             {
+                System.out.println("A client is attempting to connect...");
+
                 in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
-                String message;
-                while ((message = in.readLine()) != null)
+                System.out.println("Connected. Attempting to authenticate...");
+
+                while (!authenticated)
                 {
-                    System.out.println(String.format(format, name, message));
+                    if (clientSocket.isClosed()) throw new IOException("Connection lost.");
+                    authenticate();
+                }
+
+                System.out.println(String.format("Authenticated. %s connected.", username));
+
+                String command;
+                while ((command = in.readLine()) != null)
+                {
+                    System.out.println(String.format("< %s", command));
+                    System.out.println(String.format("> %s", command));
+                    out.println(command);
                 }
 
                 in.close();
                 out.close();
                 clientSocket.close();
             }
-            catch (IOException e) { e.printStackTrace(); }
+            catch (IOException e)
+            {
+                System.out.println("Connection lost.");
+            }
             finally
             {
                 try
@@ -110,7 +155,7 @@ public class Mainframe implements Runnable
                 catch (IOException e) {}
             }
 
-            System.out.println(String.format("[!] %s has disconnected :<", name));
+            System.out.println("Connection closed.");
         }
     }
 

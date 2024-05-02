@@ -1,6 +1,7 @@
 package utility;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Properties;
 
 /**
@@ -15,6 +16,10 @@ public final class Constants
     private Constants() {}
 
     private static final Properties P = init();
+
+    private static final String USERS_PATH = P.getProperty("USERS_PATH");
+
+    public static HashMap<String, String> USERS = Serializer.read_object(USERS_PATH);
 
     private static Properties init()
     {

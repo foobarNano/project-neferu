@@ -4,9 +4,12 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import server.Permission;
+import server.ServerFunction;
 import utility.Constants;
 import utility.Hasher;
 
@@ -19,10 +22,30 @@ public class Mainframe implements Runnable
     private ExecutorService executor = null;
     private boolean running = false;
 
+    private final HashMap<String, ServerFunction> functions;
+
     public Mainframe(int port, int limit)
     {
         this.PORT = port;
         this.LIMIT = limit;
+        functions = new HashMap<>();
+
+        // Declare server functions
+        functions.put("yell", new ServerFunction(
+            "Yells the phrase passed as argument.",
+            Permission.None
+            ){
+                @Override
+                public String apply(String[] args)
+                {
+                    if (args.length < 2) return "Proper usage: yell [STUFF TO YELL]";
+                    
+                    String joined = String.join(" ", args);
+                    return String.format("%s!", joined.substring(5).toUpperCase());
+                }
+            
+            }
+        );
     }
 
     public Mainframe(int port)
@@ -44,7 +67,7 @@ public class Mainframe implements Runnable
             while (running)
             {
                 Socket clientSocket = serverSocket.accept();
-                executor.execute(new ClientHandler(clientSocket));
+                executor.execute(new ClientHandler(this, clientSocket));
             }
         }
         catch (IOException e) { e.printStackTrace(); }
@@ -61,23 +84,18 @@ public class Mainframe implements Runnable
         }
     }
 
-    private static String handle(String command)
+    private String handle(String command)
     {
-        String[] parts = command.split(" ");
+        String[] args = command.split(" ");
+        ServerFunction function = functions.get(args[0]);
 
-        switch (parts[0])
-        {
-            case "yell":
-                if (parts.length < 2) return "Proper usage: yell [STUFF TO YELL]";
-                return String.format("%s!", command.substring(parts[0].length() + 1)).toUpperCase();
-        
-            default:
-                return String.format("Unknown command: \"%s\"", parts[0]);
-        }
+        if (function == null) return String.format("Unknown command: '%s'", args[0]);
+        return function.apply(args);
     }
 
     private static class ClientHandler implements Runnable
     {
+        private final Mainframe parent;
         private final Socket clientSocket;
 
         private String username = "Unknown";
@@ -86,8 +104,9 @@ public class Mainframe implements Runnable
         private BufferedReader in = null;
         private PrintWriter out = null;
         
-        public ClientHandler(Socket clientSocket)
+        public ClientHandler(Mainframe parent, Socket clientSocket)
         {
+            this.parent = parent;
             this.clientSocket = clientSocket;
         }
 
@@ -149,7 +168,7 @@ public class Mainframe implements Runnable
                 {
                     System.out.println(String.format("< %s", command));
 
-                    String response = Mainframe.handle(command);
+                    String response = parent.handle(command);
 
                     System.out.println(String.format("> %s", response));
                     out.println(response);

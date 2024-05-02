@@ -88,9 +88,13 @@ public class Terminal implements Runnable
             while (!(command = scanner.nextLine()).isBlank())
             {
                 out.println(command);
-
-                String response = in.readLine();
-                System.out.println(String.format("< %s", response));
+                
+                String response;
+                while (!(response = in.readLine()).isBlank())
+                {
+                    System.out.print("  ");
+                    System.out.println(response);
+                }
 
                 System.out.print("> ");
             }

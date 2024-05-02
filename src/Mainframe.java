@@ -61,6 +61,21 @@ public class Mainframe implements Runnable
         }
     }
 
+    private static String handle(String command)
+    {
+        String[] parts = command.split(" ");
+
+        switch (parts[0])
+        {
+            case "yell":
+                if (parts.length < 2) return "Proper usage: yell [STUFF TO YELL]";
+                return String.format("%s!", command.substring(parts[0].length() + 1)).toUpperCase();
+        
+            default:
+                return String.format("Unknown command: \"%s\"", parts[0]);
+        }
+    }
+
     private static class ClientHandler implements Runnable
     {
         private final Socket clientSocket;
@@ -133,8 +148,11 @@ public class Mainframe implements Runnable
                 while ((command = in.readLine()) != null)
                 {
                     System.out.println(String.format("< %s", command));
-                    System.out.println(String.format("> %s", command));
-                    out.println(command);
+
+                    String response = Mainframe.handle(command);
+
+                    System.out.println(String.format("> %s", response));
+                    out.println(response);
                 }
 
                 in.close();
